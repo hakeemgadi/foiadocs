@@ -1,5 +1,6 @@
 ﻿import os
 from selenium import webdriver
+import datetime
 import time
 import pickle
 from selenium.common.exceptions import NoSuchElementException
@@ -13,7 +14,20 @@ import urllib.request
 import openpyxl
 import pickle
 
+date_format = '%Y-%m-%d'
+def get_date():
+        while True:
+                date=input("Please enter the date in the YYYY-MM-DD format\n")
 
+                try:
+                        date_obj = datetime.datetime.strptime(date, date_format)
+                        print(date_obj)
+                        break
+                except ValueError:
+                        print("Incorrect data format, should be YYYY-MM-DD. Please try again\n")
+        return date_obj.strftime('%Y%m%d')
+
+        
 option = webdriver.ChromeOptions()
 chrome_prefs = {}
 option.experimental_options["prefs"] = chrome_prefs
@@ -21,13 +35,19 @@ chrome_prefs["profile.default_content_settings"] = {"images": 2}
 chrome_prefs["profile.managed_default_content_settings"] = {"images": 2}
 driver = webdriver.Chrome(options=option,executable_path=os.path.join("..","..","chromedriver.exe"))
 #Navigate to the application home page
-search_string = "fracking"
-beginDate="20110101" #yyyymmdd
-endDate="20120113"
+print("anaosje;kf")
+
+search_string = input('Please enter the search term\n')
+print('Please enter the search begin date\n')
+beginDate = get_date() #yyyymmdd
+print('Please enter the search end date\n')
+endDate= get_date()
+
+print(f"Downloading files for search term [{search_string}] beginning in {beginDate} and ending in {endDate}")
 driver.get(f"https://foia.state.gov/Search/Results.aspx?searchText={search_string}&beginDate={beginDate}&endDate={endDate}&publishedBeginDate=&publishedEndDate=&caseNumber=")
 
+#Create workbook to store tabulated data
 wb = openpyxl.Workbook()
-#wb = openpyxl.load_workbook()#filename = 'FilesLog.xlsx')
 ws = wb.active
 
 
@@ -40,11 +60,9 @@ startpg=1
 end_pg=int(driver.find_element_by_id("lblPagesTop").text)
 
 for i in range(startpg-1,end_pg):
-        restable=driver.find_element_by_id("tblResults")
+        result_table=driver.find_element_by_id("tblResults")
 
-#print(restable.get_attribute("innerHTML"))
-
-        rows=restable.find_elements_by_tag_name("tr")
+        rows=result_table.find_elements_by_tag_name("tr")
         for j,row in enumerate(rows):
 
                 dpoint=[]
