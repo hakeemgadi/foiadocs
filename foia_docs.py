@@ -55,69 +55,94 @@ ws = wb.active
 time.sleep(2)
 page_sz=20
 
-startpg=1
+startpg=1 #Normally 1. Unless not starting in the middle
 
+
+#Get end page number by reading the number of pages
 end_pg=int(driver.find_element_by_id("lblPagesTop").text)
 
+#Loop pages
 for i in range(startpg-1,end_pg):
+        
+        #Get result table in page
         result_table=driver.find_element_by_id("tblResults")
 
+        #Get all rows in table
         rows=result_table.find_elements_by_tag_name("tr")
+
+        #Loop result table rows
         for j,row in enumerate(rows):
 
+                #dpoint will store the fields in the current row. It is serialized later to serve as a backup for Excel rows.
                 dpoint=[]
-                
+
+                #Get all fields in row
                 data=row.find_elements_by_tag_name("td")
+
+                #Populate Excel workbook 
                 if len(data)!=0:
-                        ws.cell(i*page_sz+j,1).value=data[1].text
+                        #Write text into row i*page_sz+j
+                        cell_row = i*page_sz+j
+                        
+                        print("Prcessing row no.: {cell_row}")
+
+                        #Subject column
+                        ws.cell(cell_row,1).value=data[1].text
                         dpoint.append(data[1].text)
-                        
-                        print(len(data),i*page_sz+j)
+
+                        #Get pdf link from subject column
                         pdflink=data[1].find_element_by_tag_name("span").get_attribute("title")
-                        
+
+                        #Get file name only
                         file = pdflink.split("/")[-1]
 
-                        ws.cell(i*page_sz+j,2).hyperlink=os.path.join("..","DocStore","PDFS",file)
+                        #Construct local path of pdf
+                        ws.cell(cell_row,2).hyperlink=os.path.join("..","DocStore","PDFS",file)
                         dpoint.append(os.path.join("..","DocStore","PDFS",file))
                         
-                        ws.cell(i*page_sz+j,2).value="Local link"
+                        ws.cell(cell_row,2).value="Local link"
                         dpoint.append("Local link")
                         
-
-                        ws.cell(i*page_sz+j,3).hyperlink="https://foia.state.gov/"+pdflink
+                        #Construct a global weblink from site-local link
+                        ws.cell(cell_row,3).hyperlink="https://foia.state.gov/"+pdflink
                         dpoint.append("https://foia.state.gov/"+pdflink)
 
                         
-                        ws.cell(i*page_sz+j,3).value="FOIA link"
+                        ws.cell(cell_row,3).value="FOIA link"
                         dpoint.append("FOIA link")
 
-                        ws.cell(i*page_sz+j,4).value=file
+                        ws.cell(cell_row,4).value=file
                         dpoint.append(file)
 
-                        
+                        #Process the remaining of fields: Document Date, From, To, Posted Date, and Case Number
                         for rest in range(2,7):
-                                ws.cell(i*page_sz+j,rest+3).value=data[rest].text
+                                #Offset by 3 columns in the Excel workbook
+                                ws.cell(cell_row,rest+3).value=data[rest].text
                                 dpoint.append(data[rest].text)
 
+                        #Download the PDF
                         urllib.request.urlretrieve("https://foia.state.gov/"+pdflink, os.path.join("..","DocStore","PDFS",file))
                         print(file)
 
-                        dfile=open(os.path.join("..","DocStore","PKL",str(i*page_sz+j)+".pkl"),"wb")
+                        dfile=open(os.path.join("..","DocStore","PKL",str(cell_row)+".pkl"),"wb")
                         pickle.dump(dpoint,dfile)
                         dfile.close()
                         
                         time.sleep(2)
+        if i < end_pg-1:
+                #Go to next page if not last page
 
+                inputElement = driver.find_element_by_id("txtPageTop")
+                inputElement.clear()
+                inputElement.send_keys(i+2)
 
-        inputElement = driver.find_element_by_id("txtPageTop")
-        inputElement.clear()
-        inputElement.send_keys(i+2)
+                btn=driver.find_element_by_id("btnJumpTop")
 
-        btn=driver.find_element_by_id("btnJumpTop")
-
-        btn.click()
-        print("Click!")
+                btn.click()
+                print("Going to next page")
 
         time.sleep(3)
+
+#Save workbook
 wb.save(os.path.join("..","DocStore",'FilesLog.xlsx')) 
 
