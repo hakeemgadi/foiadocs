@@ -2,14 +2,6 @@
 from selenium import webdriver
 import datetime
 import time
-import pickle
-from selenium.common.exceptions import NoSuchElementException
-from selenium.webdriver.support.ui import Select
-from selenium.common.exceptions import TimeoutException
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-from selenium.webdriver.common.by import By
 import urllib.request
 import openpyxl
 import pickle
@@ -21,29 +13,30 @@ def get_date():
 
                 try:
                         date_obj = datetime.datetime.strptime(date, date_format)
-                        print(date_obj)
                         break
                 except ValueError:
                         print("Incorrect data format, should be YYYY-MM-DD. Please try again\n")
-        return date_obj.strftime('%Y%m%d')
+        return date_obj.strftime('%Y-%m-%d')
 
         
 option = webdriver.ChromeOptions()
 chrome_prefs = {}
 option.experimental_options["prefs"] = chrome_prefs
+#Disable image download
 chrome_prefs["profile.default_content_settings"] = {"images": 2}
 chrome_prefs["profile.managed_default_content_settings"] = {"images": 2}
 driver = webdriver.Chrome(options=option,executable_path=os.path.join("..","..","chromedriver.exe"))
-#Navigate to the application home page
-print("anaosje;kf")
 
-search_string = input('Please enter the search term\n')
-print('Please enter the search begin date\n')
+#Get input from user. Search string and date range
+search_string = input('Please enter the search term:\n')
+print('Please enter the search begin date:\n')
 beginDate = get_date() #yyyymmdd
-print('Please enter the search end date\n')
+print('Please enter the search end date: \n')
 endDate= get_date()
 
 print(f"Downloading files for search term [{search_string}] beginning in {beginDate} and ending in {endDate}")
+
+#Navigate to the application home page
 driver.get(f"https://foia.state.gov/Search/Results.aspx?searchText={search_string}&beginDate={beginDate}&endDate={endDate}&publishedBeginDate=&publishedEndDate=&caseNumber=")
 
 #Create workbook to store tabulated data
@@ -139,7 +132,7 @@ for i in range(startpg-1,end_pg):
                 btn=driver.find_element_by_id("btnJumpTop")
 
                 btn.click()
-                print("Going to next page")
+                print("Going to next page ...")
 
         time.sleep(3)
 
