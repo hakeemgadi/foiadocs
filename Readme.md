@@ -1,4 +1,4 @@
-# Automated download and FOIA files
+# Automated download and OCR of FOIA files
 
 There is a huge number of documents in the [FOIA website](https://foia.state.gov/Search/Search.aspx) (Freedom of Information Act). To make the site more useful for researchers, I have created this piece of code to make it possible to download selectively using search terms and a date range. The code first downloads the files and then OCR the scanned PDF pages, and extract any overlaid text.
 
