@@ -7,6 +7,8 @@ import openpyxl
 import pickle
 
 date_format = '%Y-%m-%d'
+
+#Function to get date from user
 def get_date():
         while True:
                 date=input("Please enter the date in the YYYY-MM-DD format\n")
@@ -18,7 +20,48 @@ def get_date():
                         print("Incorrect data format, should be YYYY-MM-DD. Please try again\n")
         return date_obj.strftime('%Y-%m-%d')
 
+#A class for fields in a row
+class Field(object):
+        def __init__(self,text=None,link=None):
+                self.text=text
+                self.link=link
+                
+        def __str__(self):
+                return ' '.join([str(self.text), str(self.link)])
+
+#A class for a single data point (To facilitate handling data points)
+class DataPoint(object):
+        def __init__(self):
+                self.entry={'subject':Field(),
+                            'local_link':Field('Local link'),
+                            'foia_link':Field('FOIA link'),
+                            'file_name':Field(),
+                            'document_date':Field(),
+                            'from':Field(),
+                            'to':Field(),
+                            'posted_date':Field(),
+                            'case_no':Field()}
+        def __str__(self):
+                accumulator=[]
+                for key,val in self.entry.items():
+                        accumulator.append(' '.join([key+':',str(val.text),str(val.link)]))
+                return '\n'.join(accumulator)
         
+        def __getitem__(self,index):
+                if index >= len(self.entry):
+                        raise StopIteration
+                return list(self.entry.values())[index]
+
+#A subclass of openpyxl.Workbook (To populate the active worksheet from a data point)
+class FOIA_Workbook(openpyxl.Workbook):
+        def update_row_from_dpoint(self,dpoint,row):
+                for field in dpoint:
+                        self.active.cell(row,i+1).value= field.text
+                        if field.link is not None:
+                                self.active.cell(row,i+1).hyperlink= field.link
+                
+
+#Initialise Chrome webdrive        
 option = webdriver.ChromeOptions()
 chrome_prefs = {}
 option.experimental_options["prefs"] = chrome_prefs
@@ -40,8 +83,8 @@ print(f"Downloading files for search term [{search_string}] beginning in {beginD
 driver.get(f"https://foia.state.gov/Search/Results.aspx?searchText={search_string}&beginDate={beginDate}&endDate={endDate}&publishedBeginDate=&publishedEndDate=&caseNumber=")
 
 #Create workbook to store tabulated data
-wb = openpyxl.Workbook()
-ws = wb.active
+wb = FOIA_Workbook()
+#ws = wb.active
 
 
 
@@ -67,7 +110,7 @@ for i in range(startpg-1,end_pg):
         for j,row in enumerate(rows):
 
                 #dpoint will store the fields in the current row. It is serialized later to serve as a backup for Excel rows.
-                dpoint=[]
+                dpoint=DataPoint()
 
                 #Get all fields in row
                 data=row.find_elements_by_tag_name("td")
@@ -77,49 +120,43 @@ for i in range(startpg-1,end_pg):
                         #Write text into row i*page_sz+j
                         cell_row = i*page_sz+j
                         
-                        print("Prcessing row no.: {cell_row}")
+                        print(f"Processing row no.: {cell_row}")
 
                         #Subject column
-                        ws.cell(cell_row,1).value=data[1].text
-                        dpoint.append(data[1].text)
+                        dpoint.entry['subject'].text = data[1].text
+                        
 
                         #Get pdf link from subject column
-                        pdflink=data[1].find_element_by_tag_name("span").get_attribute("title")
+                        pdflink = data[1].find_element_by_tag_name("span").get_attribute("title")
 
                         #Get file name only
                         file = pdflink.split("/")[-1]
 
                         #Construct local path of pdf
-                        ws.cell(cell_row,2).hyperlink=os.path.join("..","DocStore","PDFS",file)
-                        dpoint.append(os.path.join("..","DocStore","PDFS",file))
-                        
-                        ws.cell(cell_row,2).value="Local link"
-                        dpoint.append("Local link")
+                        dpoint.entry['local_link'].link = os.path.join("..","DocStore","PDFS",file)
+
                         
                         #Construct a global weblink from site-local link
-                        ws.cell(cell_row,3).hyperlink="https://foia.state.gov/"+pdflink
-                        dpoint.append("https://foia.state.gov/"+pdflink)
+                        dpoint.entry['foia_link'].link = "https://foia.state.gov/"+pdflink
 
-                        
-                        ws.cell(cell_row,3).value="FOIA link"
-                        dpoint.append("FOIA link")
 
-                        ws.cell(cell_row,4).value=file
-                        dpoint.append(file)
+                        dpoint.entry['file_name'].text = file
 
                         #Process the remaining of fields: Document Date, From, To, Posted Date, and Case Number
-                        for rest in range(2,7):
+                        for rest in range(4,9):
                                 #Offset by 3 columns in the Excel workbook
-                                ws.cell(cell_row,rest+3).value=data[rest].text
-                                dpoint.append(data[rest].text)
-
+                                dpoint[rest].text = data[rest-2].text
+                        print(dpoint)
+                        wb.update_row_from_dpoint(dpoint,cell_row)
+                        
                         #Download the PDF
                         urllib.request.urlretrieve("https://foia.state.gov/"+pdflink, os.path.join("..","DocStore","PDFS",file))
-                        print(file)
 
                         dfile=open(os.path.join("..","DocStore","PKL",str(cell_row)+".pkl"),"wb")
                         pickle.dump(dpoint,dfile)
                         dfile.close()
+                        print("=========")
+
                         
                         time.sleep(2)
         if i < end_pg-1:
